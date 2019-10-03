@@ -3,7 +3,12 @@ const multer = require('multer')()
 const crypto = require('crypto')
 const bodyParser = require('body-parser')
 const request = require('request')
+const Queue = require('better-queue');
 const app = express()
+
+const triggerApi = new Queue((url, cb) => {
+  request(url, (err, res) => cb(err, res))
+})
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
@@ -22,12 +27,14 @@ app.post('/nogi', multer.any(), (req, res) => {
       throw 'Invalid signature'
     }
 
-    const dci = new RegExp(`/http:\/\/${process.env.DCI_HOSTNAME}\/[^\/]+\/(\w+)/g`)
+    const dci = new RegExp(`http:\/\/${process.env.DCI_HOSTNAME}\/[^\/]+\/(\\w+)`, 'g')
     let match
     while(match = dci.exec(req.body['body-html'])) {
-      request(`${process.env.DCI_API}/${match[1]}`, (err, res) => {
+      const dciId = match[1]
+      console.log(`Mathed ${dciId}`)
+      triggerApi.push(`${process.env.DCI_API}/${dciId}`, (err) => {
         if (err) return console.error(err)
-        console.log(`Saved ${match[1]}`)
+        console.log(`Saved ${dciId}`)
       })
     }
     console.log(req.body)
